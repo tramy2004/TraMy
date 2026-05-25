@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createProduct, getProduct, updateProduct } from "@/api/productApi";
+// Giả sử bạn đã có api lấy danh mục, nếu chưa hãy tạo file categoryApi.js
+import { getCategories } from "@/api/categoryApi";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AlertCircle, X } from "lucide-react";
@@ -9,21 +11,29 @@ export default function ProductForm() {
     name: "",
     price: "",
     description: "",
-    image: null, // Ảnh đại diện chính (file hoặc chuỗi URL)
+    image: null,
     category_id: "",
   });
 
-  // Quản lý danh sách biến thể (Màu, Size, Số kho)
+  const [categories, setCategories] = useState([]); // State lưu danh mục
   const [variants, setVariants] = useState([{ color: "", size: "", stock: 0 }]);
-
-  // Phân tách rõ ràng Album ảnh cũ từ DB và File ảnh mới upload thêm
-  const [oldImages, setOldImages] = useState([]); // Lưu mảng chứa chuỗi đường dẫn ảnh cũ từ DB
-  const [detailImages, setDetailImages] = useState([]); // Mảng lưu các File binary ảnh mới chọn thêm
+  const [oldImages, setOldImages] = useState([]);
+  const [detailImages, setDetailImages] = useState([]);
 
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // 👉 Load data khi ở chế độ Edit
+  // Load danh mục ngay khi mở form
+  useEffect(() => {
+    // Gọi API lấy categories (bạn nhớ điều chỉnh lại đường dẫn hoặc cấu trúc res cho đúng dự án)
+    getCategories()
+      .then((res) => {
+        setCategories(res.data.data || res.data || []);
+      })
+      .catch(() => toast.error("Không thể tải danh sách danh mục!"));
+  }, []);
+
+  // Load data khi ở chế độ Edit
   useEffect(() => {
     if (id) {
       getProduct(id).then((res) => {
@@ -37,7 +47,6 @@ export default function ProductForm() {
           category_id: data.category_id || "",
         });
 
-        // Đổ danh sách biến thể cũ vào state
         if (data.variants && data.variants.length > 0) {
           setVariants(
             data.variants.map((v) => ({
@@ -48,7 +57,6 @@ export default function ProductForm() {
           );
         }
 
-        // Đổ danh sách album ảnh chi tiết cũ từ database vào state để hiển thị
         if (data.images && data.images.length > 0) {
           setOldImages(data.images.map((img) => img.image_path || img));
         }
@@ -65,7 +73,6 @@ export default function ProductForm() {
     }
   };
 
-  // --- LOGIC XỬ LÝ BIẾN THỂ ---
   const handleVariantChange = (index, field, value) => {
     const updatedVariants = [...variants];
     updatedVariants[index][field] = value;
@@ -84,23 +91,26 @@ export default function ProductForm() {
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  // --- LOGIC XỬ LÝ NHIỀU ẢNH CHI TIẾT ---
   const handleDetailImagesChange = (e) => {
     const files = Array.from(e.target.files);
-    setDetailImages([...detailImages, ...files]); // Cộng dồn ảnh mới chọn vào danh sách cũ
+    setDetailImages([...detailImages, ...files]);
   };
 
   const removeDetailImage = (index) => {
     setDetailImages(detailImages.filter((_, i) => i !== index));
   };
 
-  // 🔥 HÀM XÓA ẢNH CHI TIẾT CŨ ĐANG TỒN TẠI TRÊN SERVER
   const removeOldImage = (index) => {
     setOldImages(oldImages.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!form.category_id) {
+      toast.error("Vui lòng chọn danh mục cho sản phẩm!");
+      return;
+    }
 
     const hasInvalidVariant = variants.some((v) => !v.color || !v.size);
     if (hasInvalidVariant) {
@@ -110,26 +120,25 @@ export default function ProductForm() {
       return;
     }
 
+    // 🔥 TẠO TOAST LOADING: Thông báo cho user biết hệ thống đang up ảnh
+    const toastId = toast.loading("⏳ Đang xử lý và tải ảnh lên server...");
+
     const formData = new FormData();
     formData.append("name", form.name);
     formData.append("price", form.price);
     formData.append("description", form.description || "");
-    formData.append("category_id", form.category_id || "");
+    formData.append("category_id", form.category_id);
 
-    // 1. Chỉ append ảnh đại diện nếu nó là một File binary mới upload
     if (form.image && typeof form.image !== "string") {
       formData.append("image", form.image);
     }
 
-    // 2. Chuyển mảng object variants thành chuỗi JSON string gửi lên Laravel
     formData.append("variants", JSON.stringify(variants));
 
-    // 3. Gửi danh sách các ảnh cũ được ADMIN GIỮ LẠI (Không bấm xóa) lên để Laravel không dọn dẹp nhầm
     if (id) {
       formData.append("old_images", JSON.stringify(oldImages));
     }
 
-    // 4. Vòng lặp append mảng nhiều file ảnh chi tiết MỚI được upload thêm
     if (detailImages.length > 0) {
       detailImages.forEach((file) => {
         formData.append("images[]", file);
@@ -143,11 +152,15 @@ export default function ProductForm() {
         await createProduct(formData);
       }
 
-      toast.success("✅ Lưu sản phẩm biến thể thành công!");
+      // 🔥 CẬP NHẬT TOAST THÀNH CÔNG (Tắt vòng xoay loading)
+      toast.success("✅ Lưu sản phẩm biến thể thành công!", { id: toastId });
       navigate("/admin/products");
     } catch (err) {
       console.log("ERROR:", err.response?.data);
-      toast.error(err.response?.data?.message || "❌ Lỗi rồi fen ơi");
+      // 🔥 CẬP NHẬT TOAST THẤT BẠI
+      toast.error(err.response?.data?.message || "❌ Lỗi rồi fen ơi", {
+        id: toastId,
+      });
     }
   };
 
@@ -191,17 +204,25 @@ export default function ProductForm() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 🔥 THAY ĐỔI: Chuyển Input ID thành Select Dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Danh mục sản phẩm (Category ID)
+              Danh mục sản phẩm *
             </label>
-            <input
+            <select
               name="category_id"
-              placeholder="Nhập ID danh mục"
-              className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none bg-white"
               value={form.category_id}
               onChange={handleChange}
-            />
+              required
+            >
+              <option value="">-- Vui lòng chọn danh mục --</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* QUẢN LÝ ẢNH ĐẠI DIỆN CHÍNH */}
@@ -212,6 +233,7 @@ export default function ProductForm() {
             <input
               type="file"
               name="image"
+              accept="image/*"
               className="w-full border p-2.5 rounded-xl text-gray-500"
               onChange={handleChange}
             />
@@ -220,7 +242,7 @@ export default function ProductForm() {
                 <img
                   src={
                     typeof form.image === "string"
-                      ? `http://tramy.test/storage/${form.image}`
+                      ? `${import.meta.env.VITE_STORAGE_URL || "http://tramy.test/storage"}/${form.image}`
                       : URL.createObjectURL(form.image)
                   }
                   alt="preview main"
@@ -314,7 +336,6 @@ export default function ProductForm() {
             onChange={handleDetailImagesChange}
           />
 
-          {/* 🔥 KHỐI HIỂN THỊ 1: Hiển thị các ảnh cũ đang có trên Server */}
           {oldImages.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
@@ -327,7 +348,7 @@ export default function ProductForm() {
                     className="relative group rounded-lg overflow-hidden border shadow-xs aspect-square"
                   >
                     <img
-                      src={`http://tramy.test/storage/${path}`}
+                      src={`${import.meta.env.VITE_STORAGE_URL || "http://tramy.test/storage"}/${path}`}
                       alt="old detail"
                       className="w-full h-full object-cover"
                     />
@@ -344,7 +365,6 @@ export default function ProductForm() {
             </div>
           )}
 
-          {/* KHỐI HIỂN THỊ 2: Preview danh sách các file ảnh chi tiết MỚI CHỌN THÊM */}
           {detailImages.length > 0 && (
             <div>
               <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-2">

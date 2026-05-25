@@ -1,8 +1,7 @@
 "use client";
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Đã chuẩn Sonner
 
 import { loginApi } from "@/api/authApi";
 
@@ -37,7 +36,16 @@ export function LoginForm({
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Bắt lỗi rỗng cơ bản trước khi gọi API
+    if (!email || !password) {
+      toast.warning("Vui lòng nhập đầy đủ email và mật khẩu!");
+      return;
+    }
+
     setLoading(true);
+
+    // 🔥 NÂNG CẤP: Hiển thị toast xoay loading chờ API
+    const toastId = toast.loading("⏳ Đang xác thực thông tin đăng nhập...");
 
     try {
       const res = await loginApi({ email, password });
@@ -45,19 +53,25 @@ export function LoginForm({
       // ⚡ lưu token
       localStorage.setItem("token", res.data.token);
 
-      toast.success("Login thành công 🔥");
+      // Cập nhật toast trạng thái thành công
+      toast.success("Login thành công! Đang chuyển hướng... 🔥", {
+        id: toastId,
+      });
 
-      // 👉 redirect theo role
-      if (res.data.user?.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/");
-      }
+      // 👉 xác định route theo role
+      const targetUrl = res.data.user?.role === "admin" ? "/admin" : "/";
 
-      // reload để fetch user
-      window.location.reload();
+      // 🔥 FIX LỖI: Đợi 1 giây để user kịp đọc thông báo toast, sau đó mới điều hướng và reload
+      setTimeout(() => {
+        navigate(targetUrl);
+        window.location.reload();
+      }, 1000);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Login thất bại ❌");
+      // Cập nhật toast trạng thái lỗi
+      toast.error(
+        err?.response?.data?.message || "Login thất bại. Vui lòng thử lại ❌",
+        { id: toastId },
+      );
     } finally {
       setLoading(false);
     }
@@ -94,6 +108,7 @@ export function LoginForm({
                   placeholder="m@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading} // Khoá input khi đang load
                   required
                 />
               </Field>
@@ -107,6 +122,7 @@ export function LoginForm({
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading} // Khoá input khi đang load
                   required
                 />
               </Field>

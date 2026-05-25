@@ -1,44 +1,61 @@
 import React, { useEffect, useState } from "react";
 import axiosClient from "@/api/axios";
 import { Package, Clock, CheckCircle, XCircle, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Đã chuẩn bị sẵn Sonner
 import { useNavigate } from "react-router-dom";
 
 export default function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false); // State cho nút làm mới
+  const [refreshing, setRefreshing] = useState(false);
   const navigate = useNavigate();
 
-  // Hàm lấy data có tham số showLoading để phân biệt tải lần đầu và tải ngầm
-  const fetchMyOrders = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+  // 🔥 NÂNG CẤP: Tách bạch 3 trạng thái (Tải lần đầu, Tải ngầm tự động, Tải thủ công)
+  const fetchMyOrders = async (
+    isInitialLoad = false,
+    isManualRefresh = false,
+  ) => {
+    if (isInitialLoad) setLoading(true);
+
+    let toastId;
+    if (isManualRefresh) {
+      setRefreshing(true);
+      // Hiện toast chờ nếu user tự bấm nút cập nhật
+      toastId = toast.loading("⏳ Đang làm mới trạng thái đơn hàng...");
+    }
+
     try {
       const res = await axiosClient.get("/orders");
       setOrders(res.data);
+
+      if (isManualRefresh) {
+        // Báo thành công khi user tự làm mới
+        toast.success("✅ Đã cập nhật trạng thái mới nhất!", { id: toastId });
+      }
     } catch (error) {
-      if (showLoading) toast.error("Không thể tải danh sách đơn hàng!");
+      if (isInitialLoad || isManualRefresh) {
+        toast.error("Không thể tải danh sách đơn hàng!", { id: toastId });
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false); // Tắt hiệu ứng xoay của nút Làm mới
+      if (isInitialLoad) setLoading(false);
+      if (isManualRefresh) setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchMyOrders(true); // Lần đầu vào trang thì hiện chữ Loading
+    fetchMyOrders(true, false); // Tải lần đầu: Bật chữ Loading giữa màn hình
 
-    // 🔥 BÍ KÍP TỰ ĐỘNG CẬP NHẬT (POLLING): Mỗi 10 giây tự động gọi ngầm API 1 lần
+    // Mỗi 10 giây tự động gọi ngầm API 1 lần (Không hiện loading, không hiện toast)
     const interval = setInterval(() => {
-      fetchMyOrders(false); // false = gọi ngầm, không làm giật màn hình
+      fetchMyOrders(false, false);
     }, 10000);
 
-    // Dọn dẹp bộ đếm khi khách rời khỏi trang này
     return () => clearInterval(interval);
   }, []);
 
   const handleManualRefresh = () => {
-    setRefreshing(true);
-    fetchMyOrders(false);
+    // Gọi hàm fetch với cờ isManualRefresh = true để kích hoạt Sonner Toast
+    fetchMyOrders(false, true);
   };
 
   const renderStatus = (status) => {
@@ -80,16 +97,17 @@ export default function MyOrders() {
           <Package className="text-blue-600" size={32} /> Lịch sử đơn hàng
         </h1>
 
-        {/* Nút Làm mới thủ công cho user nào nôn nóng */}
+        {/* Nút Làm mới thủ công */}
         <button
           onClick={handleManualRefresh}
-          className="flex items-center gap-2 text-sm font-bold text-gray-600 bg-white border px-4 py-2 rounded-xl hover:bg-gray-50 transition active:scale-95 w-fit"
+          disabled={refreshing} // Khóa nút khi đang làm mới tránh click spam
+          className={`flex items-center gap-2 text-sm font-bold text-gray-600 bg-white border px-4 py-2 rounded-xl transition w-fit ${refreshing ? "opacity-70 cursor-not-allowed" : "hover:bg-gray-50 active:scale-95"}`}
         >
           <RefreshCw
             size={16}
             className={refreshing ? "animate-spin text-blue-600" : ""}
           />
-          Làm mới trạng thái
+          {refreshing ? "Đang làm mới..." : "Làm mới trạng thái"}
         </button>
       </div>
 
@@ -100,7 +118,7 @@ export default function MyOrders() {
           </p>
           <button
             onClick={() => navigate("/")}
-            className="text-blue-600 font-semibold hover:underline"
+            className="text-blue-600 font-semibold hover:underline mt-2"
           >
             &larr; Đi mua sắm ngay!
           </button>

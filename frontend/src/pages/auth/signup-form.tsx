@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Đã chuẩn Sonner
 
 import { registerApi } from "@/api/authApi";
 
@@ -40,14 +40,17 @@ export function SignupForm({
 
     // 🔥 validate
     if (password !== confirmPassword) {
-      return toast.error("Mật khẩu không khớp ❌");
+      return toast.warning("Mật khẩu không khớp ❌");
     }
 
     if (password.length < 8) {
-      return toast.error("Password phải >= 8 ký tự");
+      return toast.warning("Password phải từ 8 ký tự trở lên!");
     }
 
     setLoading(true);
+
+    // 🔥 TẠO TOAST LOADING
+    const toastId = toast.loading("⏳ Đang tạo tài khoản cho bạn...");
 
     try {
       const res = await registerApi({
@@ -60,17 +63,31 @@ export function SignupForm({
       if (res.data.token) {
         localStorage.setItem("token", res.data.token);
 
-        toast.success("Đăng ký thành công 🔥");
+        // Cập nhật toast thành công
+        toast.success("Đăng ký thành công! Đang tự động đăng nhập... 🔥", {
+          id: toastId,
+        });
 
-        navigate("/");
-        window.location.reload();
+        // Dùng setTimeout để user kịp đọc thông báo trước khi reload/chuyển trang
+        setTimeout(() => {
+          navigate("/");
+          window.location.reload();
+        }, 1000);
       } else {
-        // 👉 nếu không có token → chuyển login
-        toast.success("Tạo tài khoản thành công, hãy đăng nhập");
-        navigate("/login");
+        // 👉 nếu không có token → chuyển trang login
+        toast.success("Tạo tài khoản thành công! Hãy đăng nhập nhé", {
+          id: toastId,
+        });
+
+        setTimeout(() => {
+          navigate("/login");
+        }, 1000);
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Signup thất bại ❌");
+      // Cập nhật toast báo lỗi
+      toast.error(err?.response?.data?.message || "Đăng ký thất bại ❌", {
+        id: toastId,
+      });
     } finally {
       setLoading(false);
     }
@@ -94,6 +111,7 @@ export function SignupForm({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Doe"
+                  disabled={loading} // Khóa khi loading
                   required
                 />
               </Field>
@@ -106,6 +124,7 @@ export function SignupForm({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="m@example.com"
+                  disabled={loading} // Khóa khi loading
                   required
                 />
               </Field>
@@ -118,6 +137,7 @@ export function SignupForm({
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading} // Khóa khi loading
                     required
                   />
                 </div>
@@ -128,6 +148,7 @@ export function SignupForm({
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={loading} // Khóa khi loading
                     required
                   />
                 </div>
@@ -146,7 +167,10 @@ export function SignupForm({
 
                 <FieldDescription className="text-center">
                   Đã có tài khoản?{" "}
-                  <a href="/login" className="underline">
+                  <a
+                    href="/login"
+                    className="underline hover:text-yellow-600 transition-colors"
+                  >
                     Sign in
                   </a>
                 </FieldDescription>

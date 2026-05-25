@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getProducts, deleteProduct } from "@/api/productApi";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner"; // 🔥 Nhập toast từ sonner
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -13,6 +14,7 @@ export default function AdminProducts() {
       setProducts(res.data.data || res.data || []);
     } catch (error) {
       console.error("Lỗi lấy danh sách sản phẩm:", error);
+      toast.error("Không thể tải danh sách sản phẩm!"); // Báo lỗi lấy dữ liệu
     }
   };
 
@@ -22,16 +24,26 @@ export default function AdminProducts() {
 
   const handleDelete = async (id) => {
     if (
-      !confirm(
+      !window.confirm(
         "⚠️ Bạn có chắc chắn muốn xoá sản phẩm này và toàn bộ biến thể của nó không?",
       )
     )
       return;
+
+    // 🔥 Hiển thị toast loading khi bắt đầu xóa
+    const toastId = toast.loading("Đang xóa sản phẩm...");
+
     try {
       await deleteProduct(id);
       fetchProducts();
+      // 🔥 Cập nhật toast thành công
+      toast.success("Đã xóa sản phẩm thành công!", { id: toastId });
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể xóa sản phẩm này!");
+      // 🔥 Cập nhật toast thành báo lỗi
+      toast.error(
+        error.response?.data?.message || "Không thể xóa sản phẩm này!",
+        { id: toastId },
+      );
     }
   };
 
@@ -110,7 +122,7 @@ export default function AdminProducts() {
                       {p.id}
                     </td>
 
-                    {/* 1. HIỂN THỊ ẢNH THUMBNAIL (ĐÃ ĐỒNG BỘ DOMAIN TRAMY.TEST) */}
+                    {/* 1. HIỂN THỊ ẢNH THUMBNAIL */}
                     <td className="p-4">
                       <img
                         src={
@@ -127,11 +139,19 @@ export default function AdminProducts() {
                       />
                     </td>
 
-                    {/* 2. TÊN VÀ ĐÃ BÁN */}
+                    {/* 2. TÊN, DANH MỤC VÀ ĐÃ BÁN */}
                     <td className="p-4">
                       <div className="font-semibold text-gray-900 mb-1">
                         {p.name}
                       </div>
+
+                      {/* 🔥 HIỂN THỊ CATEGORY TẠI ĐÂY */}
+                      <div className="mb-1.5">
+                        <span className="inline-block text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium border border-slate-200">
+                          {p.category?.name || "Chưa phân loại"}
+                        </span>
+                      </div>
+
                       <div className="text-xs text-gray-400">
                         Đã bán:{" "}
                         <span className="font-medium text-gray-600">

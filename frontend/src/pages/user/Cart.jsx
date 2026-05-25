@@ -4,7 +4,7 @@ import { getCart, removeCart } from "@/api/cartApi";
 import { createOrder } from "@/api/orderApi";
 import { getMe } from "@/api/authApi";
 import axiosClient from "@/api/axios";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Thư viện Sonner
 import { Wallet, Banknote, MapPin, Phone, Plus, Minus, X } from "lucide-react";
 
 const Cart = () => {
@@ -73,14 +73,20 @@ const Cart = () => {
   };
 
   const handleRemove = async (itemId) => {
+    // 🔥 Hiển thị loading khi đang gọi API xóa
+    const toastId = toast.loading("🗑️ Đang xoá sản phẩm...");
+    
     try {
       await removeCart(itemId);
-      toast.success("🗑️ Đã xoá sản phẩm khỏi giỏ");
+      // 🔥 Cập nhật toast báo thành công
+      toast.success("Đã xoá sản phẩm khỏi giỏ hàng!", { id: toastId });
+      
       setCartItems((prev) => prev.filter((item) => item.id !== itemId));
       setSelectedIds((prev) => prev.filter((id) => id !== itemId));
       window.dispatchEvent(new Event("CartUpdated"));
     } catch (error) {
-      toast.error("Xoá thất bại, thử lại nhé!");
+      // 🔥 Cập nhật toast báo lỗi
+      toast.error("Xoá thất bại, vui lòng thử lại!", { id: toastId });
     }
   };
 
@@ -96,6 +102,9 @@ const Cart = () => {
       return;
     }
 
+    // 🔥 Hiển thị loading chờ đặt hàng
+    const toastId = toast.loading("⏳ Đang xử lý đơn hàng của bạn...");
+
     try {
       setLoading(true);
       const res = await createOrder({
@@ -106,14 +115,21 @@ const Cart = () => {
       if (paymentMethod === "online") {
         setCurrentOrder(res.data);
         setShowQRModal(true);
+        toast.success("Tạo đơn hàng thành công! Vui lòng quét mã QR.", { id: toastId });
       } else {
-        toast.success("🎉 Đặt hàng thành công!");
-        window.dispatchEvent(new Event("CartUpdated"));
-        navigate("/my-orders");
+        // Trạng thái COD
+        toast.success("🎉 Đặt hàng thành công! Đang chuyển trang...", { id: toastId });
+        
+        // 🔥 Đợi 1 giây để user kịp đọc thông báo rồi mới nhảy trang
+        setTimeout(() => {
+          window.dispatchEvent(new Event("CartUpdated"));
+          navigate("/my-orders");
+        }, 1000);
       }
     } catch (error) {
       toast.error(
         error.response?.data?.message || "Lỗi đặt hàng, vui lòng thử lại!",
+        { id: toastId }
       );
     } finally {
       setLoading(false);
@@ -124,11 +140,9 @@ const Cart = () => {
     .filter((item) => selectedIds.includes(item.id))
     .reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
-  // 🔥 NÂNG CẤP 1: Kiểm tra thông tin địa chỉ theo 3 trường rút gọn mới
   const isMissingInfo =
     !user?.phone || !user?.address_detail || !user?.ward || !user?.province;
 
-  // Hàm ghép chuỗi địa chỉ gọn gàng hiển thị ở panel bên phải
   const renderFullAddress = () => {
     if (!user) return "";
     const parts = [user.address_detail, user.ward, user.province].filter(
@@ -195,7 +209,7 @@ const Cart = () => {
                     <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden border flex-shrink-0">
                       {item.product.image ? (
                         <img
-                          src={`http://tramy.test/storage/${item.product.image}`}
+                          src={`${import.meta.env.VITE_STORAGE_URL || "http://tramy.test/storage"}/${item.product.image}`}
                           alt={item.product.name}
                           className="w-full h-full object-cover"
                         />
@@ -213,7 +227,6 @@ const Cart = () => {
                         {item.product.name}
                       </h3>
 
-                      {/* 🔥 NÂNG CẤP 2: ĐỔ DỮ LIỆU PHÂN LOẠI MÀU / SIZE RA ĐÂY */}
                       {item.variant && (
                         <div className="flex gap-2 mt-1">
                           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-medium">
