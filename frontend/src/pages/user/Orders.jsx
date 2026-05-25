@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 // 🔥 NÂNG CẤP: Import luôn hàm cancelOrder tập trung từ orderApi cho chuyên nghiệp
 import { getOrders, cancelOrder } from "@/api/orderApi";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Đã chuẩn bị Sonner
 import { AlertCircle, X } from "lucide-react";
 
 const Orders = () => {
@@ -49,14 +49,19 @@ const Orders = () => {
     }
 
     setSubmitLoading(true);
+
+    // 🔥 TẠO TOAST LOADING: Chặn user spam và hiện trạng thái chờ
+    const toastId = toast.loading("⏳ Đang xử lý yêu cầu hủy đơn của bạn...");
+
     try {
-      // 🔥 SỬA TẠI ĐÂY: Sử dụng trực tiếp hàm cancelOrder đã đóng gói sạch sẽ
+      // Sử dụng trực tiếp hàm cancelOrder đã đóng gói sạch sẽ
       await cancelOrder(selectedOrderId, {
         status: "cancelled",
         cancel_reason: cancelReason.trim(),
       });
 
-      toast.success("🗑️ Đã huỷ đơn hàng thành công!");
+      // 🔥 Cập nhật toast thành công
+      toast.success("🗑️ Đã huỷ đơn hàng thành công!", { id: toastId });
       setIsModalOpen(false); // Đóng modal
 
       // Cập nhật lại state cục bộ ngay lập tức để UI đổi màu/badge sang Đã hủy
@@ -68,8 +73,10 @@ const Orders = () => {
         ),
       );
     } catch (error) {
+      // 🔥 Cập nhật toast báo lỗi
       toast.error(
         error.response?.data?.message || "Không thể huỷ đơn hàng vào lúc này!",
+        { id: toastId },
       );
     } finally {
       setSubmitLoading(false);
@@ -170,7 +177,7 @@ const Orders = () => {
                       <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden border flex-shrink-0">
                         {item.product?.image ? (
                           <img
-                            src={`http://tramy.test/storage/${item.product.image}`}
+                            src={`${import.meta.env.VITE_STORAGE_URL || "http://tramy.test/storage"}/${item.product.image}`}
                             alt={item.product?.name}
                             className="w-full h-full object-cover"
                           />
@@ -250,8 +257,9 @@ const Orders = () => {
             {/* Nút đóng góc phải */}
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+              onClick={() => !submitLoading && setIsModalOpen(false)} // Khóa nút đóng khi đang load
+              className="absolute top-4 right-4 p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition disabled:opacity-50"
+              disabled={submitLoading}
             >
               <X size={20} />
             </button>
@@ -278,7 +286,8 @@ const Orders = () => {
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   placeholder="Ví dụ: Mình đặt nhầm phân loại, muốn đổi địa chỉ, hết tiền..."
-                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none text-sm focus:border-black focus:ring-1 focus:ring-black transition resize-none placeholder-gray-400 bg-gray-50/50 text-gray-800"
+                  disabled={submitLoading} // Khóa textarea khi đang load
+                  className="w-full px-4 py-3 rounded-2xl border border-gray-200 outline-none text-sm focus:border-black focus:ring-1 focus:ring-black transition resize-none placeholder-gray-400 bg-gray-50/50 text-gray-800 disabled:opacity-60"
                 ></textarea>
               </div>
 
@@ -287,7 +296,8 @@ const Orders = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 transition active:scale-95"
+                  disabled={submitLoading}
+                  className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 bg-white hover:bg-gray-50 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Đóng
                 </button>

@@ -11,8 +11,9 @@ import Profile from "@/pages/user/Profile";
 import Dashboard from "@/pages/admin/Dashboard";
 import AdminProducts from "@/pages/admin/AdminProducts";
 import ProductForm from "@/pages/admin/ProductForm";
-// 🔥 BƯỚC 1: Import thêm trang Quản lý đơn hàng của Admin
 import AdminOrders from "@/pages/admin/AdminOrders";
+// 🔥 BỔ SUNG: Import component AdminCategory chúng ta vừa tạo
+import AdminCategory from "@/pages/admin/AdminCategory";
 
 // AUTH
 import { LoginForm } from "@/pages/auth/login-form";
@@ -57,7 +58,6 @@ export default function App() {
           }
         />
 
-        {/* 🔥 BƯỚC 2: Sửa "orders" thành "my-orders" cho khớp với URL */}
         <Route
           path="my-orders"
           element={
@@ -80,11 +80,17 @@ export default function App() {
         }
       >
         <Route index element={<Dashboard />} />
+
+        {/* Quản lý sản phẩm */}
         <Route path="products" element={<AdminProducts />} />
         <Route path="products/create" element={<ProductForm />} />
         <Route path="products/:id/edit" element={<ProductForm />} />
-        {/* 🔥 BƯỚC 3: Thêm Route cho Quản lý đơn hàng Admin */}
+
+        {/* Quản lý đơn hàng */}
         <Route path="orders" element={<AdminOrders />} />
+
+        {/* 🔥 BỔ SUNG: Khai báo Route cho Quản lý danh mục */}
+        <Route path="categories" element={<AdminCategory />} />
       </Route>
     </Routes>
   );

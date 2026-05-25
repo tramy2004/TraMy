@@ -9,7 +9,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
-import axiosClient from "@/api/axios"; // 🔥 SỬA: Đổi sang dùng axiosClient đồng bộ với hệ thống có token
+import axiosClient from "@/api/axios";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -32,15 +32,22 @@ export default function AdminLayout() {
     fetchStoreName();
   }, []);
 
+  // 🔥 NÂNG CẤP: Xử lý Đăng xuất mượt mà với Sonner
   const handleLogout = async () => {
+    const toastId = toast.loading("⏳ Đang xử lý đăng xuất...");
     try {
       await axiosClient.post("/logout");
     } catch (e) {
       console.error(e);
     } finally {
+      // Dù API thành công hay lỗi (do token hết hạn trước đó), vẫn xóa token local
       localStorage.removeItem("token");
-      toast.success("👋 Đã đăng xuất khỏi Admin!");
-      navigate("/login");
+      toast.success("👋 Đã đăng xuất an toàn!", { id: toastId });
+
+      // Delay một chút để user kịp đọc lời chào tạm biệt
+      setTimeout(() => {
+        navigate("/login");
+      }, 800);
     }
   };
 
@@ -52,11 +59,13 @@ export default function AdminLayout() {
           {/* Logo Admin */}
           <div className="h-16 flex items-center px-6 border-b">
             <div
-              className="text-2xl font-black text-gray-900 tracking-tight cursor-pointer flex items-baseline gap-1.5 select-none"
+              className="text-2xl font-black text-gray-900 tracking-tight cursor-pointer flex items-baseline gap-1.5 select-none transition hover:opacity-80"
               onClick={() => navigate("/admin")}
             >
-              {/* 🔥 HIỂN THỊ TÊN ĐỘNG: Tự động đổi thành TraMyShop hoặc bất kỳ tên gì Admin cài đặt */}
-              <span>{storeName}</span>
+              {/* 🔥 HIỂN THỊ TÊN ĐỘNG */}
+              <span className="truncate max-w-[120px]" title={storeName}>
+                {storeName}
+              </span>
               <span className="text-blue-600 text-lg font-bold">ADMIN</span>
             </div>
           </div>
@@ -126,7 +135,7 @@ export default function AdminLayout() {
         <div className="p-4 border-t space-y-2">
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl font-medium transition"
+            className="flex items-center gap-3 w-full px-4 py-3 text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl font-medium transition active:scale-95"
           >
             <Home size={20} />
             Xem trang User
@@ -134,7 +143,7 @@ export default function AdminLayout() {
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition"
+            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-medium transition active:scale-95"
           >
             <LogOut size={20} />
             Đăng xuất

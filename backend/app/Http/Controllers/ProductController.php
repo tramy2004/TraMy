@@ -14,8 +14,8 @@ class ProductController extends Controller
     // GET /products
     public function index(Request $request)
     {
-        // Eager load luôn 'variants' và 'images' để bên React loop qua lấy màu/size
-        $query = Product::with(['variants', 'images']);
+        // 🔥 Đã thêm 'category' vào đây để React lấy được tên danh mục
+        $query = Product::with(['variants', 'images', 'category']);
 
         if ($request->has('search') && $request->search != '') {
             $searchTerm = $request->search;
@@ -24,7 +24,7 @@ class ProductController extends Controller
                   ->orWhere('description', 'like', '%' . $searchTerm . '%');
             });
 
-            // 🔥 Lưu vết hành vi tìm kiếm (search) của User phục vụ AI gợi ý
+            // Lưu vết hành vi tìm kiếm (search) của User phục vụ AI gợi ý
             if ($request->user()) {
                 UserBehavior::create([
                     'user_id'      => $request->user()->id,
@@ -41,8 +41,8 @@ class ProductController extends Controller
     // GET /products/{id}
     public function show(Request $request, $id)
     {
-        // Lấy chi tiết sản phẩm kèm đống biến thể và hình ảnh chi tiết
-        $product = Product::with(['variants', 'images'])->findOrFail($id);
+        // 🔥 Đã thêm 'category' vào đây
+        $product = Product::with(['variants', 'images', 'category'])->findOrFail($id);
 
         // tracking AI khi xem chi tiết sản phẩm (view)
         if ($request->user()) {
@@ -64,7 +64,7 @@ class ProductController extends Controller
             'name'        => 'required|string',
             'description' => 'nullable|string',
             'price'       => 'required|numeric',
-            'category_id' => 'nullable|integer',
+            'category_id' => 'required|exists:categories,id', // 🔥 Ép buộc phải chọn danh mục hợp lệ
             'image'       => 'nullable|image|mimes:jpeg,png,jpg,gif|max:9000', 
             'variants'    => 'required', 
             'images'      => 'nullable|array', 
@@ -112,11 +112,12 @@ class ProductController extends Controller
                 }
             }
 
-            return $product->load(['variants', 'images']);
+            // 🔥 Trả về sản phẩm vừa tạo kèm luôn danh mục
+            return $product->load(['variants', 'images', 'category']);
         });
     }
 
-    // 🔥 NÂNG CẤP TOÀN DIỆN: PUT /products/{id} (Xử lý sửa mượt mà ảnh chính + album ảnh)
+    // NÂNG CẤP TOÀN DIỆN: PUT /products/{id} (Xử lý sửa mượt mà ảnh chính + album ảnh)
     public function update(Request $request, $id)
     {
         $product = Product::findOrFail($id);
@@ -125,47 +126,42 @@ class ProductController extends Controller
         $data = $request->validate([
             'name'         => 'sometimes|required|string',
             'price'        => 'sometimes|numeric',
-            'image'        => 'nullable|image|mimes:jpeg,png,jpg,gif|max:9000', // Sửa lại để nhận diện file ảnh mới
+            'image'        => 'nullable|image|mimes:jpeg,png,jpg,gif|max:9000', 
             'description'  => 'nullable|string',
-            'category_id'  => 'nullable|integer',
+            'category_id'  => 'nullable|exists:categories,id', // 🔥 Validate an toàn nếu có đổi danh mục
             'variants'     => 'sometimes', 
-            'old_images'   => 'nullable|string', // Nhận chuỗi JSON danh sách ảnh cũ được giữ lại từ React
-            'images'       => 'nullable|array', // Mảng các file ảnh chi tiết bổ sung mới
+            'old_images'   => 'nullable|string', 
+            'images'       => 'nullable|array', 
             'images.*'     => 'image|mimes:jpeg,png,jpg,gif|max:9000',
         ]);
 
         DB::transaction(function () use ($request, $product, $data) {
             
-            // 🔥 HÀM XỬ LÝ 1: Cập nhật Ảnh Đại Diện Chính nếu Admin chọn file mới
+            // HÀM XỬ LÝ 1: Cập nhật Ảnh Đại Diện Chính nếu Admin chọn file mới
             if ($request->hasFile('image')) {
-                // Xóa file ảnh đại diện cũ trong folder storage để dọn rác vật lý
                 if ($product->image) {
                     Storage::disk('public')->delete($product->image);
                 }
-                // Lưu file mới đè lên biến data
                 $data['image'] = $request->file('image')->store('products', 'public');
             } else {
-                // Nếu không chọn ảnh mới, gỡ trường 'image' ra khỏi mảng data để tránh update đè chuỗi URL cũ
                 unset($data['image']);
             }
 
             // Cập nhật thông tin gốc sản phẩm
             $product->update($data);
 
-            // 🔥 HÀM XỬ LÝ 2: Đồng bộ Album ảnh chi tiết (Xóa ảnh bị Admin bỏ - Thêm ảnh mới chọn)
+            // HÀM XỬ LÝ 2: Đồng bộ Album ảnh chi tiết (Xóa ảnh bị Admin bỏ - Thêm ảnh mới chọn)
             if ($request->has('old_images')) {
-                $oldImages = json_decode($request->old_images, true); // Mảng chứa các đường dẫn được giữ lại
+                $oldImages = json_decode($request->old_images, true); 
                 if (is_array($oldImages)) {
-                    // Lọc ra các ảnh cũ trong DB mà KHÔNG NẰM TRONG mảng giữ lại để tiến hành thanh trừng
                     $imagesToDelete = $product->images()->whereNotIn('image_path', $oldImages)->get();
                     foreach ($imagesToDelete as $img) {
-                        Storage::disk('public')->delete($img->image_path); // Xóa file vật lý
-                        $img->delete(); // Xóa bản ghi DB
+                        Storage::disk('public')->delete($img->image_path); 
+                        $img->delete(); 
                     }
                 }
             }
 
-            // Nếu Admin chọn thêm các tệp hình ảnh chi tiết mới tinh, lưu bổ sung vào DB
             if ($request->hasFile('images')) {
                 foreach ($request->file('images') as $file) {
                     $path = $file->store('products/details', 'public');
@@ -181,7 +177,6 @@ class ProductController extends Controller
                 $variants = is_string($request->variants) ? json_decode($request->variants, true) : $request->variants;
                 
                 if (is_array($variants)) {
-                    // Xóa sạch các cấu hình biến thể cũ đi rồi nạp lại loạt mới tinh từ UI gửi xuống
                     $product->variants()->delete();
                     
                     foreach ($variants as $variant) {
@@ -197,7 +192,8 @@ class ProductController extends Controller
             }
         });
 
-        return response()->json($product->load(['variants', 'images']));
+        // 🔥 Trả về thông tin đầy đủ kèm danh mục sau khi update
+        return response()->json($product->load(['variants', 'images', 'category']));
     }
 
     // DELETE /products/{id}

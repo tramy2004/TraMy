@@ -9,7 +9,6 @@
 
     /* --- Path --- */
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "allowJs": true,
     "paths": {
       "@/*": ["./src/*"],

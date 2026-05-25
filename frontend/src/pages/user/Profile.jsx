@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import axios from "@/api/axios";
-import { toast } from "sonner";
+import { toast } from "sonner"; // Đã chuẩn bị Sonner
 import { User, Mail, Calendar, MapPin, Phone } from "lucide-react";
 
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false); // Trạng thái bật/tắt form sửa
+  
+  // State quản lý block submit form
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // State lưu dữ liệu form ứng với 3 trường địa chỉ mới
   const [formData, setFormData] = useState({
@@ -43,16 +46,33 @@ export default function Profile() {
   // Xử lý khi bấm Lưu thay đổi
   const handleUpdate = async (e) => {
     e.preventDefault();
+    
+    // Kiểm tra sơ bộ: Nếu đang ở form edit mà để trống tên thì chặn lại
+    if (!formData.name.trim()) {
+      toast.warning("Họ và tên không được để trống!");
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    // 🔥 TẠO TOAST LOADING: Báo hiệu hệ thống đang lưu thông tin
+    const toastId = toast.loading("⏳ Đang lưu thông tin cá nhân của bạn...");
+
     try {
-      setLoading(true);
       const res = await axios.put("/me", formData);
       setUser(res.data.user); // Cập nhật lại UI bằng data mới từ Laravel trả về
       setIsEditing(false); // Tắt form sửa
-      toast.success("✅ Cập nhật thông tin thành công!");
+      
+      // 🔥 CẬP NHẬT TOAST THÀNH CÔNG
+      toast.success("✅ Cập nhật thông tin thành công!", { id: toastId });
     } catch (error) {
-      toast.error("Cập nhật thất bại, vui lòng kiểm tra lại.");
+      // 🔥 CẬP NHẬT TOAST THẤT BẠI
+      toast.error(
+        error.response?.data?.message || "Cập nhật thất bại, vui lòng kiểm tra lại.", 
+        { id: toastId }
+      );
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -67,11 +87,11 @@ export default function Profile() {
 
   if (loading && !user)
     return (
-      <div className="text-center mt-20 text-gray-500">⏳ Đang tải...</div>
+      <div className="text-center mt-20 text-gray-500 font-medium">⏳ Đang tải hồ sơ...</div>
     );
   if (!user)
     return (
-      <div className="text-center mt-20 text-red-500">Lỗi tải dữ liệu.</div>
+      <div className="text-center mt-20 text-red-500 font-bold">Lỗi tải dữ liệu. Vui lòng F5 lại trang.</div>
     );
 
   return (
@@ -81,8 +101,21 @@ export default function Profile() {
           👤 Thông tin tài khoản
         </h1>
         <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="text-blue-600 font-medium hover:underline"
+          onClick={() => {
+            setIsEditing(!isEditing);
+            // Nếu hủy chỉnh sửa, tự động reset form về data cũ của user
+            if (isEditing) {
+              setFormData({
+                name: user.name || "",
+                phone: user.phone || "",
+                address_detail: user.address_detail || "",
+                ward: user.ward || "",
+                province: user.province || "",
+              });
+            }
+          }}
+          disabled={isSubmitting} // Khóa nút hủy nếu đang lưu
+          className="text-blue-600 font-medium hover:underline disabled:opacity-50"
         >
           {isEditing ? "Hủy chỉnh sửa" : "Chỉnh sửa thông tin"}
         </button>
@@ -102,7 +135,8 @@ export default function Profile() {
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                disabled={isSubmitting} // Khóa input khi đang lưu
+                className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60 disabled:bg-gray-50"
                 required
               />
             </div>
@@ -117,7 +151,8 @@ export default function Profile() {
                 onChange={(e) =>
                   setFormData({ ...formData, phone: e.target.value })
                 }
-                className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                disabled={isSubmitting} // Khóa input khi đang lưu
+                className="w-full border px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-60 disabled:bg-gray-50"
                 placeholder="Nhập số điện thoại..."
               />
             </div>
@@ -138,7 +173,8 @@ export default function Profile() {
                   onChange={(e) =>
                     setFormData({ ...formData, address_detail: e.target.value })
                   }
-                  className="w-full border bg-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                  disabled={isSubmitting}
+                  className="w-full border bg-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm disabled:opacity-60 disabled:bg-gray-100"
                   placeholder="Ví dụ: 123 Đường ABC"
                 />
               </div>
@@ -154,7 +190,8 @@ export default function Profile() {
                     onChange={(e) =>
                       setFormData({ ...formData, ward: e.target.value })
                     }
-                    className="w-full border bg-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    disabled={isSubmitting}
+                    className="w-full border bg-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm disabled:opacity-60 disabled:bg-gray-100"
                     placeholder="Ví dụ: Phường Láng Hạ"
                   />
                 </div>
@@ -169,7 +206,8 @@ export default function Profile() {
                     onChange={(e) =>
                       setFormData({ ...formData, province: e.target.value })
                     }
-                    className="w-full border bg-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    disabled={isSubmitting}
+                    className="w-full border bg-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm disabled:opacity-60 disabled:bg-gray-100"
                     placeholder="Ví dụ: Hà Nội"
                   />
                 </div>
@@ -178,18 +216,22 @@ export default function Profile() {
 
             <button
               type="submit"
-              disabled={loading}
-              className="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg w-full hover:bg-blue-700 transition"
+              disabled={isSubmitting}
+              className={`font-bold py-3 px-6 rounded-lg w-full transition active:scale-95 ${
+                isSubmitting 
+                  ? "bg-blue-400 text-white cursor-not-allowed" 
+                  : "bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200"
+              }`}
             >
-              {loading ? "Đang lưu..." : "Lưu thay đổi"}
+              {isSubmitting ? "⏳ Đang lưu thông tin..." : "Lưu thay đổi"}
             </button>
           </form>
         ) : (
           /* ================= GIAO DIỆN XEM THÔNG TIN ================= */
           <div className="space-y-6">
             <div className="flex items-center gap-6 border-b pb-8 mb-8">
-              <div className="w-24 h-24 bg-blue-600 text-white rounded-full flex items-center justify-center text-4xl font-bold shadow-md">
-                {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+              <div className="w-24 h-24 bg-blue-600 text-white rounded-full flex items-center justify-center text-4xl font-bold shadow-md uppercase">
+                {user.name ? user.name.charAt(0) : "U"}
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
@@ -201,14 +243,14 @@ export default function Profile() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex items-center gap-4 text-gray-700">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-blue-600">
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-blue-600 shrink-0">
                   <Phone size={20} />
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Số điện thoại</p>
                   <p className="font-medium text-lg">
                     {user.phone || (
-                      <span className="text-red-500 text-sm">
+                      <span className="text-red-500 text-sm italic">
                         Chưa cập nhật
                       </span>
                     )}
@@ -224,7 +266,7 @@ export default function Profile() {
                   <p className="text-sm text-gray-500">Địa chỉ giao hàng</p>
                   <p className="font-medium text-lg leading-snug">
                     {renderFullAddress() || (
-                      <span className="text-red-500 text-sm">
+                      <span className="text-red-500 text-sm italic">
                         Chưa cập nhật địa chỉ chi tiết
                       </span>
                     )}
@@ -233,7 +275,7 @@ export default function Profile() {
               </div>
 
               <div className="flex items-center gap-4 text-gray-700">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-blue-600">
+                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-blue-600 shrink-0">
                   <Calendar size={20} />
                 </div>
                 <div>

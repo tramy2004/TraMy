@@ -21,4 +21,6 @@ export const updateProduct = (id, data) =>
     },
   });
 
+export const getCategories = () => axios.get("/categories");
+
 export const deleteProduct = (id) => axios.delete(`/products/${id}`);
